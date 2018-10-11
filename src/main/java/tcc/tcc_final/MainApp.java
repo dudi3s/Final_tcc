@@ -43,7 +43,7 @@ public class MainApp extends Application {
 
     private static boolean ASC = true;
     private static boolean DESC = false;
-    private static String mes = "setembro";
+    private static String mes = "julho";
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -74,15 +74,17 @@ public class MainApp extends Application {
         HashMap<String, Tweet> dataset = buildDataSet("coletas/exp/" + mes, dicionario);
         FileWriter fw = new FileWriter(new File(mes + ".txt"));
         BufferedWriter bw = new BufferedWriter(fw);
-        
-//        bw.write("id\n");
-//
-//        for (Entry<String, Tweet> tc : dataset.entrySet()) {
-//            bw.write("\"" + tc.getKey() + "\"" + "\n");
-//        }
-//
-//        System.out.println("done");
-//        bw.close();
+
+        bw.write("id\n");
+
+        for (Entry<String, Tweet> tc : dataset.entrySet()) {
+            bw.write("\"" + tc.getKey() + "\"" + "\n");
+        }
+
+        bw.close();
+        fw.close();
+        System.out.println("done");
+
         //HashMap<String, Integer> rank = buidUserRank(dataset);
         //HashMap<Integer, List<Tweet>> tweets_por_faixa = buildFaixas(dataset);
         //buildArquivosFaixas(tweets_por_faixa, mes);
@@ -100,7 +102,6 @@ public class MainApp extends Application {
 //
 //            System.out.println("\n");
 //        }
-
         //selected2AnotatePraias("/anotacao/anotados/", dataset, mes);
     }
 
