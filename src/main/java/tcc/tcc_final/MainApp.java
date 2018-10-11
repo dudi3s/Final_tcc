@@ -82,7 +82,6 @@ public class MainApp extends Application {
 //
 //        System.out.println("done");
 //        bw.close();
-
         //HashMap<String, Integer> rank = buidUserRank(dataset);
         //HashMap<Integer, List<Tweet>> tweets_por_faixa = buildFaixas(dataset);
         //buildArquivosFaixas(tweets_por_faixa, mes);
@@ -91,7 +90,6 @@ public class MainApp extends Application {
         //geraCSV2(rank, "ranks/" + mes + ".csv", DESC);
         //selected2Anotate("distribuicao/" + mes + "/todasFaixas.csv", dataset, 200);
         //System.out.println(dataset.size());
-        
         HashMap<String, HashMap<String, Integer>> classes = buildUnigramaPolarizado("anotacao/anotados/");
         for (Entry<String, HashMap<String, Integer>> cl : classes.entrySet()) {
             System.out.println("CLASSE: " + cl.getKey());
@@ -713,4 +711,38 @@ public class MainApp extends Application {
         return dic;
     }
 
+    private static void selected2AnotatePraias(String path, HashMap<String, Tweet> dataset, String mes) throws FileNotFoundException, IOException {
+        FileReader fr = new FileReader(new File(path));
+        BufferedReader br = new BufferedReader(fr);
+
+        List<String> ids = new ArrayList<>();
+
+        String line = br.readLine();
+        line = br.readLine();
+
+        while (line != null) {
+            String[] aux = line.split(";");
+            String id = aux[0];
+            String selected = aux[1];
+            if (selected.endsWith("1")) {
+                ids.add(id);
+            }
+            line = br.readLine();
+        }
+
+        br.close();
+        fr.close();
+
+        for (String id : ids) {
+
+            FileWriter fw = new FileWriter(new File("anotacao/paraAnotar_+" + mes + ".csv"));
+            BufferedWriter bw = new BufferedWriter(fw);
+            bw.write("id;texto;anotador1;anotador2;anotador3\n");
+
+            bw.write(id + "; \"" + dataset.get(id).getText() + "\";\" \";\" \";\" \"\n");
+
+            bw.close();
+            fw.close();
+        }
+    }
 }
