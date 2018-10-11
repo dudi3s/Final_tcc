@@ -71,13 +71,14 @@ public class MainApp extends Application {
         HashMap<String, String> dicionario = buildDicionarioInternet("dicionarios/dicionario_internetes.txt");
         //List<Lexico> lexico = buildDicionarioLexico("dicionarios/lexico_v3.txt");
 
-//        HashMap<String, Tweet> dataset = buildDataSet("coletas/exp/" + mes, dicionario);
-//        FileWriter fw = new FileWriter(new File(mes + ".txt"));
-//        BufferedWriter bw = new BufferedWriter(fw);
+        HashMap<String, Tweet> dataset = buildDataSet("coletas/exp/" + mes, dicionario);
+        FileWriter fw = new FileWriter(new File(mes + ".txt"));
+        BufferedWriter bw = new BufferedWriter(fw);
+        
 //        bw.write("id\n");
 //
 //        for (Entry<String, Tweet> tc : dataset.entrySet()) {
-//            bw.write(tc.getKey() + "\n");
+//            bw.write("\"" + tc.getKey() + "\"" + "\n");
 //        }
 //
 //        System.out.println("done");
@@ -90,15 +91,17 @@ public class MainApp extends Application {
         //geraCSV2(rank, "ranks/" + mes + ".csv", DESC);
         //selected2Anotate("distribuicao/" + mes + "/todasFaixas.csv", dataset, 200);
         //System.out.println(dataset.size());
-        HashMap<String, HashMap<String, Integer>> classes = buildUnigramaPolarizado("anotacao/anotados/");
-        for (Entry<String, HashMap<String, Integer>> cl : classes.entrySet()) {
-            System.out.println("CLASSE: " + cl.getKey());
-            for (Entry<String, Integer> pf : cl.getValue().entrySet()) {
-                System.out.println(pf.getKey() + ": " + pf.getValue());
-            }
+//        HashMap<String, HashMap<String, Integer>> classes = buildUnigramaPolarizado("anotacao/anotados/");
+//        for (Entry<String, HashMap<String, Integer>> cl : classes.entrySet()) {
+//            System.out.println("CLASSE: " + cl.getKey());
+//            for (Entry<String, Integer> pf : cl.getValue().entrySet()) {
+//                System.out.println(pf.getKey() + ": " + pf.getValue());
+//            }
+//
+//            System.out.println("\n");
+//        }
 
-            System.out.println("\n");
-        }
+        //selected2AnotatePraias("/anotacao/anotados/", dataset, mes);
     }
 
     //Método que lê o arquivo .JSON e realiza a construção do dataset em memória do mesmo
@@ -732,17 +735,20 @@ public class MainApp extends Application {
 
         br.close();
         fr.close();
+        int i = 0;
 
         for (String id : ids) {
+            if (i < 100) {
+                FileWriter fw = new FileWriter(new File("anotacao/paraAnotar_+" + mes + ".csv"));
+                BufferedWriter bw = new BufferedWriter(fw);
+                bw.write("id;texto;anotador1;anotador2;anotador3\n");
 
-            FileWriter fw = new FileWriter(new File("anotacao/paraAnotar_+" + mes + ".csv"));
-            BufferedWriter bw = new BufferedWriter(fw);
-            bw.write("id;texto;anotador1;anotador2;anotador3\n");
+                bw.write(id + "; \"" + dataset.get(id).getText() + "\";\" \";\" \";\" \"\n");
 
-            bw.write(id + "; \"" + dataset.get(id).getText() + "\";\" \";\" \";\" \"\n");
-
-            bw.close();
-            fw.close();
+                bw.close();
+                fw.close();
+                i++;
+            }
         }
     }
 }
