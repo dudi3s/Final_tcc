@@ -83,7 +83,15 @@ public class MainApp extends Application {
         //Lista com os ids dos tweets anotados e suas respectivas polaridades;
         HashMap<String, Integer> t_pol = ids_anotadosManual(a1, a2, a3);
 
-        buildDataSetAnotado(t_pol, dicionario_lexico, datasetOriginal);
+        //Dataset de tweets anotados com seus respectivos unigramas/bigramas polarizados e suas frequencias (TF E TF-normalizada);
+        HashMap<String, Tweet> datasetAnotado = buildDataSetAnotado(t_pol, dicionario_lexico, datasetOriginal);
+
+        //Dataset de unigramas dos tweets anotados e suas frequencias;
+        HashMap<String, Integer> unigrama = buildUnigrama(datasetAnotado);
+        for (Entry<String, Integer> li : unigrama.entrySet()) {
+            System.out.println(li.getKey() + " " + li.getValue());
+        }
+
         System.out.println("DONE!");
 
     }
@@ -353,19 +361,21 @@ public class MainApp extends Application {
 
             int totalUni = freq_uni.size();
             int totalBi = freq_bi.size();
-            
+
             freq_uni.entrySet().forEach((lf) -> {
                 Frequencia f = lf.getValue();
-                lf.getValue().setTf_normalizad(f.getTf()/(double)totalUni);
+                lf.getValue().setTf_normalizad(f.getTf() / (double) totalUni);
             });
-            
+
             freq_bi.entrySet().forEach((lf) -> {
                 Frequencia f = lf.getValue();
-                lf.getValue().setTf_normalizad(f.getTf()/(double)totalBi);
+                lf.getValue().setTf_normalizad(f.getTf() / (double) totalBi);
             });
-            
+
             fromDB.setFreq_bigrama(freq_bi);
             fromDB.setFreq_unigrama(freq_uni);
+
+            datasetAnotado.put(fromDB.getId(), fromDB);
 
 //            for (Entry<Lexico, Frequencia> lf : freq_bi.entrySet()) {
 //                System.out.println(lf.getKey() + " " + lf.getValue());
@@ -373,10 +383,11 @@ public class MainApp extends Application {
 //            for (Entry<Lexico, Frequencia> lf : freq_uni.entrySet()) {
 //                System.out.println(lf.getKey() + " " + lf.getValue());
 //            }
-//            System.out.println("\n\n");
+            System.out.println(tweets_read);
             tweets_read++;
         }
 
+        System.out.println("Size Dataset: " + datasetAnotado.size());
         return datasetAnotado;
     }
 
@@ -581,231 +592,39 @@ public class MainApp extends Application {
     }
 
     //Métodos para criar o Unigrama e Bigrama;    
-    private static HashMap<String, HashMap<String, Integer>> buildUnigramaPolarizado(String path, List<Lexico> dicionarioLexico) throws FileNotFoundException, IOException {
-        HashMap<String, HashMap<String, Integer>> unigrama = new HashMap<>();
-        unigrama.put("POS", new HashMap<>());
-        unigrama.put("NEG", new HashMap<>());
-        unigrama.put("IRON", new HashMap<>());
-        unigrama.put("OUT", new HashMap<>());
+    private static HashMap<String, Integer> buildUnigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
+        HashMap<String, Integer> unigrama = new HashMap<>();
 
-        List<String> verbosLig = new ArrayList<>();
-        verbosLig.add("ser");
-        verbosLig.add("estar");
-        verbosLig.add("parecer");
-        verbosLig.add("permanecer");
-        verbosLig.add("ficar");
-        verbosLig.add("continuar");
-        verbosLig.add("andar");
-        verbosLig.add("tornar");
-        verbosLig.add("ano");
-        verbosLig.add("nao");
-        verbosLig.add("ter");
-        verbosLig.add("mais");
-        verbosLig.add("ir");
-        verbosLig.add("ja");
-        verbosLig.add("como");
-        verbosLig.add("fazer");
-        verbosLig.add("haver");
-        verbosLig.add("poder");
-        verbosLig.add("muito");
-        verbosLig.add("so");
-
-        File folder = new File(path);
-        File[] listOfFiles = folder.listFiles();
-
-        for (File file : listOfFiles) {
-            if (file.isFile()) {
-
-                FileReader fr = new FileReader(file);
-                BufferedReader br = new BufferedReader(fr);
-
-                String line = br.readLine();
-                line = br.readLine();
-
-                int l_int = 1;
-                while (line != null) {
-
-                    String[] temp = line.split(";");
-                    String id = temp[0];
-                    String pol_anotada = temp[temp.length - 1];
-
-                    StringBuilder text_tmp = new StringBuilder();
-                    for (int i = 1; i <= temp.length - 2; i++) {
-                        text_tmp.append(temp[i]).append(" ");
-                    }
-
-                    String text_final = StringUtils.normalizeSpace(text_tmp.toString().replace("\"", ""));
-
-                    ComponentFactory factory = ComponentFactory.create(new Locale("pt", "BR"));
-                    Analyzer cogroo = factory.createPipe();
-
-                    Document document = new DocumentImpl();
-                    document.setText(text_final);
-
-                    cogroo.analyze(document);
-
-                    HashMap<String, Integer> pal_freq = unigrama.get(pol_anotada);
-
-                    document.getSentences().forEach((sentence) -> {
-                        sentence.getTokens().forEach((token) -> {
-                            for (String s : token.getLemmas()) {
-                                String t_type = token.getPOSTag();
-                                String sAcento = removerAcentos(s).toLowerCase();
-
-                                if ((t_type.equals("n") || t_type.equals("prop") || t_type.equals("adj") || t_type.equals("adv")
-                                        || t_type.equals("v-fin") || t_type.equals("v-inf") || t_type.equals("v-pcp") || t_type.equals("v-ger")) && !verbosLig.contains(sAcento)) {
-
-                                    int polaridade = 1;
-                                    char anot = 'M';
-
-                                    for (Lexico aux : dicionarioLexico) {
-                                        //Se o token atual possui sentimento, de acordo com o dic
-                                        if (aux.getPalavra().equals(sAcento)) {
-                                            anot = aux.getTipo_anotacao();
-
-                                            switch (aux.getPolaridade()) {
-                                                case -1:
-                                                    polaridade = -2;
-                                                    break;
-                                                case 1:
-                                                    polaridade = 2;
-                                                    break;
-                                                default:
-                                                    polaridade = 1;
-                                            }
-                                            break;
-                                        } //Se não foi encontrado o sentimento do token atual
-                                    }
-
-                                    //Lexico que representa um token anotado manualmente a polaridade;
-                                    Lexico l = new Lexico(sAcento, t_type, anot, polaridade);
-
-                                    //Adicionar o léxico à lista do tweet respectivo contabilizando sua frequencia;
-                                    if (true) //                                    if (pal_freq.containsKey(sAcento)) {
-                                    //                                        int freq = pal_freq.get(sAcento);
-                                    //                                        pal_freq.put(sAcento, (freq + 1));
-                                    //
-                                    //                                    } else {
-                                    //                                        pal_freq.put(sAcento, 1);
-                                    //                                    }
-                                    {
-
-                                    }
-                                }
-                            }
-                        });
-                    });
-
-                    unigrama.put(pol_anotada, pal_freq);
-
-                    //System.out.println("ID:" + id + "\n" + "TEXTO: " + text_final + "\n" + "POLARIDADE: " + pol_anotada);
-                    line = br.readLine();
-                    //System.out.println(l_int);
-                    l_int++;
+        for (Entry<String, Tweet> t : dataseAnotado.entrySet()) {
+            HashMap<Lexico, Frequencia> t_fre = t.getValue().getFreq_unigrama();
+            for (Entry<Lexico, Frequencia> lex_freq : t_fre.entrySet()) {
+                String lexico = lex_freq.getKey().getPalavra();
+                if (unigrama.containsKey(lexico)) {
+                    int fA = unigrama.get(lexico);
+                    unigrama.put(lexico, fA + 1);
+                } else {
+                    unigrama.put(lexico, 1);
                 }
             }
         }
+
         return unigrama;
     }
 
-    private static HashMap<String, HashMap<String, Integer>> buildBigramaPolarizado(String path) throws FileNotFoundException, IOException {
-        HashMap<String, HashMap<String, Integer>> bigrama = new HashMap<>();
-        bigrama.put("POS", new HashMap<>());
-        bigrama.put("NEG", new HashMap<>());
-        bigrama.put("IRON", new HashMap<>());
-        bigrama.put("OUT", new HashMap<>());
+    private static HashMap<String, Integer> buildBigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
+        HashMap<String, Integer> bigrama = new HashMap<>();
 
-        List<String> verbosLig = new ArrayList<>();
-        verbosLig.add("ser");
-        verbosLig.add("estar");
-        verbosLig.add("parecer");
-        verbosLig.add("permanecer");
-        verbosLig.add("ficar");
-        verbosLig.add("continuar");
-        verbosLig.add("andar");
-        verbosLig.add("tornar");
-        verbosLig.add("ano");
-        verbosLig.add("nao");
-        verbosLig.add("ter");
-        verbosLig.add("mais");
-        verbosLig.add("ir");
-        verbosLig.add("ja");
-        verbosLig.add("como");
-        verbosLig.add("fazer");
-        verbosLig.add("haver");
-        verbosLig.add("poder");
-        verbosLig.add("muito");
-        verbosLig.add("so");
-
-        FileReader fr = new FileReader(new File(path));
-        BufferedReader br = new BufferedReader(fr);
-
-        String line = br.readLine();
-        line = br.readLine();
-
-        int l_int = 1;
-        while (line != null) {
-
-            String[] temp = line.split(";");
-            String id = temp[0];
-            String pol_anotada = temp[temp.length - 1];
-
-            StringBuilder text_tmp = new StringBuilder();
-            for (int i = 1; i <= temp.length - 2; i++) {
-                text_tmp.append(temp[i]).append(" ");
+        for (Entry<String, Tweet> t : dataseAnotado.entrySet()) {
+            HashMap<Lexico, Frequencia> t_fre = t.getValue().getFreq_bigrama();
+            for (Entry<Lexico, Frequencia> lex_freq : t_fre.entrySet()) {
+                String lexico = lex_freq.getKey().getPalavra();
+                if (bigrama.containsKey(lexico)) {
+                    int fA = bigrama.get(lexico);
+                    bigrama.put(lexico, fA + 1);
+                } else {
+                    bigrama.put(lexico, 1);
+                }
             }
-
-            String text_final = StringUtils.normalizeSpace(text_tmp.toString().replace("\"", ""));
-
-            ComponentFactory factory = ComponentFactory.create(new Locale("pt", "BR"));
-            Analyzer cogroo = factory.createPipe();
-
-            Document document = new DocumentImpl();
-            document.setText(text_final);
-
-            cogroo.analyze(document);
-
-            HashMap<String, Integer> pal_freq = bigrama.get(pol_anotada);
-
-            document.getSentences().forEach((sentence) -> {
-                sentence.getSyntacticChunks().forEach((structure) -> {
-                    List<String> aux = new ArrayList<>();
-                    structure.getTokens().forEach((token) -> {
-                        for (String s : token.getLemmas()) {
-                            String t_type = token.getPOSTag();
-                            String sAcento = removerAcentos(s);
-
-                            if ((t_type.equals("n") || t_type.equals("prop") || t_type.equals("adj") || t_type.equals("adv")
-                                    || t_type.equals("v-fin") || t_type.equals("v-inf") || t_type.equals("v-pcp") || t_type.equals("v-ger")) && !verbosLig.contains(sAcento)) {
-
-                                aux.add(removerAcentos(sAcento));
-                            }
-                        }
-                    });
-
-                    if (aux.size() > 1) {
-                        for (int i = 0; i < aux.size() - 1; i = i + 2) {
-                            StringBuilder bigr = new StringBuilder();
-                            bigr.append(aux.get(i)).append(" ").append(aux.get(i + 1));
-                            System.out.println(bigr.toString());
-
-                            if (pal_freq.containsKey(bigr.toString())) {
-                                int freq = pal_freq.get(bigr.toString());
-                                pal_freq.put(bigr.toString(), (freq + 1));
-                            } else {
-                                pal_freq.put(bigr.toString(), 1);
-                            }
-                        }
-                    }
-                });
-            });
-
-            bigrama.put(pol_anotada, pal_freq);
-
-            //System.out.println("ID:" + id + "\n" + "TEXTO: " + text_final + "\n" + "POLARIDADE: " + pol_anotada);
-            line = br.readLine();
-            //System.out.println(l_int);
-            l_int++;
         }
 
         return bigrama;
