@@ -16,10 +16,8 @@ import java.io.IOException;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import static java.util.Collections.list;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,12 +25,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -42,8 +38,6 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.cogroo.analyzer.Analyzer;
 import org.cogroo.analyzer.ComponentFactory;
-import org.cogroo.checker.CheckDocument;
-import org.cogroo.checker.GrammarChecker;
 import org.cogroo.text.Document;
 import org.cogroo.text.impl.DocumentImpl;
 
@@ -87,11 +81,12 @@ public class MainApp extends Application {
         HashMap<String, Tweet> datasetAnotado = buildDataSetAnotado(t_pol, dicionario_lexico, datasetOriginal);
 
         //Dataset de unigramas dos tweets anotados e suas frequencias;
-        HashMap<String, Integer> unigrama = buildUnigrama(datasetAnotado);
-        for (Entry<String, Integer> li : unigrama.entrySet()) {
-            System.out.println(li.getKey() + " " + li.getValue());
-        }
-
+        HashMap<Integer, HashMap<String, Integer>> unigrama = buildUnigrama(datasetAnotado);
+        //printMapSorted(unigrama);
+        
+        //Dataset de bigramas dos tweets anotados e suas frequencias;
+        HashMap<Integer, HashMap<String, Integer>> bigrama = buildBigrama(datasetAnotado);
+        printMapSorted(bigrama);
         System.out.println("DONE!");
 
     }
@@ -169,7 +164,7 @@ public class MainApp extends Application {
 
                             if (!text.equals("") && atleastOneAlpha) {
                                 User u = new User(user_id, location, user_name, followers);
-                                Tweet t = new Tweet(id, lang, text, created, retweeted, u);
+                                Tweet t = new Tweet(id, lang, text, created, retweeted, u, 0);
 
                                 tweets.put(id, t);
                             }
@@ -225,6 +220,7 @@ public class MainApp extends Application {
 
         for (Entry<String, Integer> t : tweets_anotados.entrySet()) {
             Tweet fromDB = datasetOriginal.get(t.getKey());
+            int tweet_polaridade = t.getValue();
 
             String text_final = fromDB.getText();
             HashMap<Lexico, Frequencia> freq_uni = fromDB.getFreq_unigrama();
@@ -374,6 +370,7 @@ public class MainApp extends Application {
 
             fromDB.setFreq_bigrama(freq_bi);
             fromDB.setFreq_unigrama(freq_uni);
+            fromDB.setPolaridade(tweet_polaridade);
 
             datasetAnotado.put(fromDB.getId(), fromDB);
 
@@ -592,39 +589,59 @@ public class MainApp extends Application {
     }
 
     //Métodos para criar o Unigrama e Bigrama;    
-    private static HashMap<String, Integer> buildUnigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
-        HashMap<String, Integer> unigrama = new HashMap<>();
+    private static HashMap<Integer, HashMap<String, Integer>> buildUnigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
+        HashMap<Integer, HashMap<String, Integer>> unigrama = new HashMap<>();
+        unigrama.put(1, new HashMap<>());
+        unigrama.put(2, new HashMap<>());
+        unigrama.put(3, new HashMap<>());
+        unigrama.put(4, new HashMap<>());
+        unigrama.put(5, new HashMap<>());
 
         for (Entry<String, Tweet> t : dataseAnotado.entrySet()) {
+            int polaridade = t.getValue().getPolaridade();
+            HashMap<String, Integer> tokens = unigrama.get(polaridade);
+
             HashMap<Lexico, Frequencia> t_fre = t.getValue().getFreq_unigrama();
             for (Entry<Lexico, Frequencia> lex_freq : t_fre.entrySet()) {
                 String lexico = lex_freq.getKey().getPalavra();
-                if (unigrama.containsKey(lexico)) {
-                    int fA = unigrama.get(lexico);
-                    unigrama.put(lexico, fA + 1);
+                if (tokens.containsKey(lexico)) {
+                    int fA = tokens.get(lexico);
+                    tokens.put(lexico, fA + 1);
                 } else {
-                    unigrama.put(lexico, 1);
+                    tokens.put(lexico, 1);
                 }
             }
+
+            unigrama.put(polaridade, tokens);
         }
 
         return unigrama;
     }
 
-    private static HashMap<String, Integer> buildBigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
-        HashMap<String, Integer> bigrama = new HashMap<>();
+    private static HashMap<Integer, HashMap<String, Integer>> buildBigrama(HashMap<String, Tweet> dataseAnotado) throws FileNotFoundException, IOException {
+        HashMap<Integer, HashMap<String, Integer>> bigrama = new HashMap<>();
+        bigrama.put(1, new HashMap<>());
+        bigrama.put(2, new HashMap<>());
+        bigrama.put(3, new HashMap<>());
+        bigrama.put(4, new HashMap<>());
+        bigrama.put(5, new HashMap<>());
 
         for (Entry<String, Tweet> t : dataseAnotado.entrySet()) {
+            int polaridade = t.getValue().getPolaridade();
+            HashMap<String, Integer> tokens = bigrama.get(polaridade);
+
             HashMap<Lexico, Frequencia> t_fre = t.getValue().getFreq_bigrama();
             for (Entry<Lexico, Frequencia> lex_freq : t_fre.entrySet()) {
                 String lexico = lex_freq.getKey().getPalavra();
-                if (bigrama.containsKey(lexico)) {
-                    int fA = bigrama.get(lexico);
-                    bigrama.put(lexico, fA + 1);
+                if (tokens.containsKey(lexico)) {
+                    int fA = tokens.get(lexico);
+                    tokens.put(lexico, fA + 1);
                 } else {
-                    bigrama.put(lexico, 1);
+                    tokens.put(lexico, 1);
                 }
             }
+
+            bigrama.put(polaridade, tokens);
         }
 
         return bigrama;
@@ -802,5 +819,26 @@ public class MainApp extends Application {
         }
 
         return maiorOc;
+    }
+
+    private static void printMapSorted(HashMap<Integer, HashMap<String, Integer>> classes_lexicos) {
+        for (Entry<Integer, HashMap<String, Integer>> li : classes_lexicos.entrySet()) {
+            System.out.println("Classe: " + li.getKey());
+
+            Object[] a = li.getValue().entrySet().toArray();
+            Arrays.sort(a, new Comparator() {
+                public int compare(Object o1, Object o2) {
+                    return ((Map.Entry<String, Integer>) o2).getValue()
+                            .compareTo(((Map.Entry<String, Integer>) o1).getValue());
+                }
+            });
+
+            for (Object e : a) {
+                System.out.println(((Map.Entry<String, Integer>) e).getKey() + " : "
+                        + ((Map.Entry<String, Integer>) e).getValue());
+            }
+
+            System.out.println("");
+        }
     }
 }

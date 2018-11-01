@@ -14,12 +14,12 @@ import java.util.HashMap;
 public class Tweet {
 
     private String id, lang, text, created;
-    private int retweeted;
+    private int retweeted, polaridade;
     private User user;
     private HashMap<Lexico, Frequencia> freq_unigrama;
     private HashMap<Lexico, Frequencia> freq_bigrama;
 
-    public Tweet(String id, String lang, String text, String created, int retweeted, User user) {
+    public Tweet(String id, String lang, String text, String created, int retweeted, User user, int polaridade) {
         this.id = id;
         this.lang = lang;
         this.text = text;
@@ -28,6 +28,7 @@ public class Tweet {
         this.user = user;
         this.freq_unigrama = new HashMap<>();
         this.freq_bigrama = new HashMap<>();
+        this.polaridade = polaridade;
     }
 
     public String getId() {
@@ -94,8 +95,17 @@ public class Tweet {
         this.freq_bigrama = freq_bigrama;
     }
 
+    public int getPolaridade() {
+        return polaridade;
+    }
+
+    public void setPolaridade(int polaridade) {
+        this.polaridade = polaridade;
+    }
+
     @Override
     public String toString() {
-        return "Tweet{" + "id=" + id + ", lang=" + lang + ", text=" + text + ", created=" + created + ", retweeted=" + retweeted + ", user=" + user + '}';
+        return "Tweet{" + "id=" + id + ", lang=" + lang + ", text=" + text + ", created=" + created + ", retweeted=" + retweeted + ", polaridade=" + polaridade + ", user=" + user + ", freq_unigrama=" + freq_unigrama + ", freq_bigrama=" + freq_bigrama + '}';
     }
+
 }
