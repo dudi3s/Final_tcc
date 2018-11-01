@@ -5,6 +5,8 @@
  */
 package auxiliares;
 
+import java.util.HashMap;
+
 /**
  *
  * @author Eduardo
@@ -14,6 +16,8 @@ public class Tweet {
     private String id, lang, text, created;
     private int retweeted;
     private User user;
+    private HashMap<Lexico, Frequencia> freq_unigrama;
+    private HashMap<Lexico, Frequencia> freq_bigrama;
 
     public Tweet(String id, String lang, String text, String created, int retweeted, User user) {
         this.id = id;
@@ -22,6 +26,8 @@ public class Tweet {
         this.created = created;
         this.retweeted = retweeted;
         this.user = user;
+        this.freq_unigrama = new HashMap<>();
+        this.freq_bigrama = new HashMap<>();
     }
 
     public String getId() {
@@ -70,6 +76,22 @@ public class Tweet {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public HashMap<Lexico, Frequencia> getFreq_unigrama() {
+        return freq_unigrama;
+    }
+
+    public void setFreq_unigrama(HashMap<Lexico, Frequencia> freq_unigrama) {
+        this.freq_unigrama = freq_unigrama;
+    }
+
+    public HashMap<Lexico, Frequencia> getFreq_bigrama() {
+        return freq_bigrama;
+    }
+
+    public void setFreq_bigrama(HashMap<Lexico, Frequencia> freq_bigrama) {
+        this.freq_bigrama = freq_bigrama;
     }
 
     @Override

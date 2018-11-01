@@ -1,5 +1,6 @@
 package tcc.tcc_final;
 
+import auxiliares.Frequencia;
 import auxiliares.Lexico;
 import auxiliares.Tweet;
 import auxiliares.User;
@@ -15,7 +16,10 @@ import java.io.IOException;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import static java.util.Collections.list;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,10 +27,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -36,6 +42,8 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.cogroo.analyzer.Analyzer;
 import org.cogroo.analyzer.ComponentFactory;
+import org.cogroo.checker.CheckDocument;
+import org.cogroo.checker.GrammarChecker;
 import org.cogroo.text.Document;
 import org.cogroo.text.impl.DocumentImpl;
 
@@ -43,7 +51,10 @@ public class MainApp extends Application {
 
     private static boolean ASC = true;
     private static boolean DESC = false;
-    private static String mes = "julho";
+    private static String mes = "setembro";
+    private static String a1 = "anotacao/anotados/csv/tweets_Joao_c.csv";
+    private static String a2 = "anotacao/anotados/csv/tweets_Natassia_c.csv";
+    private static String a3 = "anotacao/anotados/csv/tweets_Robinson_c.csv";
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -57,61 +68,33 @@ public class MainApp extends Application {
         stage.show();
     }
 
-    /**
-     * The main() method is ignored in correctly deployed JavaFX application.
-     * main() serves only as fallback in case the application can not be
-     * launched through deployment artifacts, e.g., in IDEs with limited FX
-     * support. NetBeans ignores main().
-     *
-     * @param args the command line arguments
-     */
     public static void main(String[] args) throws IOException {
         //launch(args);
 
-        HashMap<String, String> dicionario = buildDicionarioInternet("dicionarios/dicionario_internetes.txt");
-        //List<Lexico> lexico = buildDicionarioLexico("dicionarios/lexico_v3.txt");
+        //Dicionário de palavras abreviadas e escritas pela internet, utilizado para "normalização" do texto;
+        HashMap<String, String> dicionario_internetes = buildDicionarioInternet("dicionarios/dicionario_internetes.txt");
 
-        HashMap<String, Tweet> dataset = buildDataSet("coletas/exp/" + mes, dicionario);
-        FileWriter fw = new FileWriter(new File(mes + ".txt"));
-        BufferedWriter bw = new BufferedWriter(fw);
+        //Dicionário Léxico contendo a polaridade de diversas palavras para o cálculo da polarização do tweet;
+        HashMap<String, Lexico> dicionario_lexico = buildDicionarioLexico("dicionarios/lexicos/");
 
-        bw.write("id\n");
+        //Dataset original de tweets coletados;
+        HashMap<String, Tweet> datasetOriginal = buildDataSet("coletas/exp_all/", dicionario_internetes);
 
-        for (Entry<String, Tweet> tc : dataset.entrySet()) {
-            bw.write("\"" + tc.getKey() + "\"" + "\n");
-        }
+        //Lista com os ids dos tweets anotados e suas respectivas polaridades;
+        HashMap<String, Integer> t_pol = ids_anotadosManual(a1, a2, a3);
 
-        bw.close();
-        fw.close();
-        System.out.println("done");
+        buildDataSetAnotado(t_pol, dicionario_lexico, datasetOriginal);
+        System.out.println("DONE!");
 
-        //HashMap<String, Integer> rank = buidUserRank(dataset);
-        //HashMap<Integer, List<Tweet>> tweets_por_faixa = buildFaixas(dataset);
-        //buildArquivosFaixas(tweets_por_faixa, mes);
-        //HashMap<String, Tweet> dataset_news = buildDataSetNews(dataset);
-        //geraCSV(dataset, "datasets/" + mes + ".csv");
-        //geraCSV2(rank, "ranks/" + mes + ".csv", DESC);
-        //selected2Anotate("distribuicao/" + mes + "/todasFaixas.csv", dataset, 200);
-        //System.out.println(dataset.size());
-//        HashMap<String, HashMap<String, Integer>> classes = buildUnigramaPolarizado("anotacao/anotados/");
-//        for (Entry<String, HashMap<String, Integer>> cl : classes.entrySet()) {
-//            System.out.println("CLASSE: " + cl.getKey());
-//            for (Entry<String, Integer> pf : cl.getValue().entrySet()) {
-//                System.out.println(pf.getKey() + ": " + pf.getValue());
-//            }
-//
-//            System.out.println("\n");
-//        }
-        //selected2AnotatePraias("/anotacao/anotados/", dataset, mes);
     }
 
     //Método que lê o arquivo .JSON e realiza a construção do dataset em memória do mesmo
     //utilizando a API Jackson
-    private static HashMap<String, Tweet> buildDataSet(String path, HashMap<String, String> dic) throws IOException {
+    private static HashMap<String, Tweet> buildDataSet(String path_mes_dir, HashMap<String, String> dic_internetes) throws IOException {
         HashMap<String, Tweet> tweets = new HashMap<>();
         ObjectMapper mapper = new ObjectMapper();
 
-        File folder = new File(path);
+        File folder = new File(path_mes_dir);
         File[] listOfFiles = folder.listFiles();
 
         for (File file : listOfFiles) {
@@ -154,17 +137,18 @@ public class MainApp extends Application {
                         //então essa opinião que é salva.
                         if (!text.equals("") || (!text.equals("") && !rtText.equals(""))) {
                             //Remoção de quebras de linhas e ENTERs.
-                            text = StringUtils.normalizeSpace(text);
+                            text = StringUtils.normalizeSpace(text).toLowerCase();
                             text = removeUrl(text);
                             text = text.replace("#", "");
                             text = text.replace("...", "");
+                            text = text.replace(";", "");
 
                             String[] temp = text.toLowerCase().split(" ");
                             StringBuilder textoTratado = new StringBuilder(text.length());
 
                             for (String s : temp) {
-                                if (dic.containsKey(s)) {
-                                    textoTratado.append(dic.get(s));
+                                if (dic_internetes.containsKey(s)) {
+                                    textoTratado.append(dic_internetes.get(s));
                                 } else {
                                     textoTratado.append(s);
                                 }
@@ -190,7 +174,7 @@ public class MainApp extends Application {
                     fr.close();
 
                 } catch (FileNotFoundException ex) {
-                    System.out.println("Caminho não localizado: " + path);
+                    System.out.println("Caminho não localizado: " + path_mes_dir);
                 } catch (IOException ex) {
                     System.out.println("Não foi possível ler o arquivo");
                 }
@@ -200,22 +184,200 @@ public class MainApp extends Application {
         return tweets;
     }
 
-    private static String removeUrl(String commentstr) {
+    private static HashMap<String, Tweet> buildDataSetAnotado(HashMap<String, Integer> tweets_anotados, HashMap<String, Lexico> dicionario_lexico, HashMap<String, Tweet> datasetOriginal) throws FileNotFoundException, IOException {
+        HashMap<String, Tweet> datasetAnotado = new HashMap<>();
 
-        // rid of ? and & in urls since replaceAll can't deal with them
-        String commentstr1 = commentstr.replaceAll("\\?", "").replaceAll("\\&", "").replaceAll("\\(", "").replaceAll("\\)", "");
+        List<String> verbosLig = new ArrayList<>();
+        verbosLig.add("ser");
+        verbosLig.add("estar");
+        verbosLig.add("parecer");
+        verbosLig.add("permanecer");
+        verbosLig.add("ficar");
+        verbosLig.add("continuar");
+        verbosLig.add("andar");
+        verbosLig.add("tornar");
+        verbosLig.add("ano");
+        verbosLig.add("não");
+        verbosLig.add("ter");
+        verbosLig.add("mais");
+        verbosLig.add("ir");
+        verbosLig.add("já");
+        verbosLig.add("como");
+        verbosLig.add("fazer");
+        verbosLig.add("haver");
+        verbosLig.add("poder");
+        verbosLig.add("muito");
+        verbosLig.add("só");
 
-        String urlPattern = "((https?|ftp|gopher|telnet|file|Unsure|http):((//)|(\\\\))+[\\w\\d:#@%/;$()~_?\\+-=\\\\\\.&]*)";
-        Pattern p = Pattern.compile(urlPattern, Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(commentstr1);
-        int i = 0;
-        while (m.find()) {
-            if (m.group(i) != null) {
-                commentstr = commentstr1.replaceAll(m.group(i), "").trim();
-                i++;
-            }
+        int tweets_read = 1;
+        ComponentFactory factory = ComponentFactory.create(new Locale("pt", "BR"));
+        Analyzer cogroo = factory.createPipe();
+
+        Document document = new DocumentImpl();
+
+        for (Entry<String, Integer> t : tweets_anotados.entrySet()) {
+            Tweet fromDB = datasetOriginal.get(t.getKey());
+
+            String text_final = fromDB.getText();
+            HashMap<Lexico, Frequencia> freq_uni = fromDB.getFreq_unigrama();
+            HashMap<Lexico, Frequencia> freq_bi = fromDB.getFreq_bigrama();
+
+            document.setText(text_final);
+            cogroo.analyze(document);
+
+            document.getSentences().forEach((sentence) -> {
+                sentence.getTokens().forEach((token) -> {
+                    for (String s : token.getLemmas()) {
+                        String t_type = token.getPOSTag();
+                        s = s.toLowerCase();
+
+                        if ((t_type.equals("n") || t_type.equals("prop") || t_type.equals("adj") || t_type.equals("adv")
+                                || t_type.equals("v-fin") || t_type.equals("v-inf") || t_type.equals("v-pcp") || t_type.equals("v-ger")) && !verbosLig.contains(s)) {
+
+                            int polaridade = 1;
+                            char anot = 'M';
+
+                            Lexico aux = dicionario_lexico.get(s);
+                            //Se o token atual possui sentimento de acordo com o dic léxico;
+                            if (aux != null) {
+                                anot = aux.getTipo_anotacao();
+
+                                switch (aux.getPolaridade()) {
+                                    case -1:
+                                        polaridade = -2;
+                                        break;
+                                    case 1:
+                                        polaridade = 2;
+                                        break;
+                                    default:
+                                        polaridade = 1;
+                                }
+                            }
+
+                            //Lexico que representa um token anotado manualmente a polaridade;
+                            Lexico l = new Lexico(s, t_type, anot, polaridade);
+
+                            //Adicionar o léxico à lista do tweet respectivo contabilizando sua frequencia;
+                            if (freq_uni.containsKey(l)) {
+                                Frequencia f = freq_uni.get(l);
+                                int fA = f.getTf();
+                                f.setTf(fA + 1);
+                                freq_uni.put(l, f);
+                            } else {
+                                freq_uni.put(l, new Frequencia(1, 0.0));
+                            }
+                        }
+                    }
+                });
+
+                sentence.getSyntacticChunks().forEach((structure) -> {
+                    List<Lexico> aux = new ArrayList<>();
+
+                    structure.getTokens().forEach((token) -> {
+                        for (String s : token.getLemmas()) {
+                            String t_type = token.getPOSTag();
+                            s = s.toLowerCase();
+
+                            if ((t_type.equals("n") || t_type.equals("prop") || t_type.equals("adj") || t_type.equals("adv")
+                                    || t_type.equals("v-fin") || t_type.equals("v-inf") || t_type.equals("v-pcp") || t_type.equals("v-ger")) && !verbosLig.contains(s)) {
+
+                                int polaridade = 1;
+                                char anot = 'M';
+
+                                Lexico l_aux = dicionario_lexico.get(s);
+                                //Se o token atual possui sentimento de acordo com o dic léxico;
+                                if (l_aux != null) {
+                                    anot = l_aux.getTipo_anotacao();
+
+                                    switch (l_aux.getPolaridade()) {
+                                        case -1:
+                                            polaridade = -2;
+                                            break;
+                                        case 1:
+                                            polaridade = 2;
+                                            break;
+                                        default:
+                                            polaridade = 1;
+                                    }
+                                }
+
+                                //Lexico que representa um token anotado manualmente a polaridade;
+                                Lexico l = new Lexico(s, t_type, anot, polaridade);
+                                aux.add(l);
+                            }
+                        }
+                    });
+
+                    if (aux.size() > 1) {
+                        for (int i = 0; i < aux.size() - 1; i = i + 2) {
+                            StringBuilder bigr = new StringBuilder();
+
+                            //Realizar o somatório das polaridades para definir a do termo composto.
+                            Lexico first = aux.get(i);
+                            Lexico second = aux.get(i + 1);
+
+                            bigr.append(first.getPalavra()).append(" ").append(second.getPalavra());
+
+                            int f_pol = first.getPolaridade();
+                            int s_pol = second.getPolaridade();
+
+                            int pol_final = 1;
+
+                            //Caso os dois termos não sejam neutros;
+                            if (f_pol != 1 && s_pol != 1) {
+                                int result = f_pol + s_pol;
+                                if (result > 0) {
+                                    pol_final = 2;
+                                } else {
+                                    pol_final = -2;
+                                }
+                            }
+
+                            //Realizar a contagem de frequencia;
+                            Lexico fin = new Lexico(bigr.toString(), first.getPostag() + "+" + second.getPostag(), 'M', pol_final);
+
+                            if (freq_bi.containsKey(fin)) {
+                                Frequencia f = freq_bi.get(fin);
+                                int fA = f.getTf();
+                                f.setTf(fA + 1);
+                                freq_bi.put(fin, f);
+
+                            } else {
+                                freq_bi.put(fin, new Frequencia(1, 0.0));
+                            }
+                        }
+                    }
+                });
+
+            });
+
+            int totalUni = freq_uni.size();
+            int totalBi = freq_bi.size();
+            
+            freq_uni.entrySet().forEach((lf) -> {
+                Frequencia f = lf.getValue();
+                lf.getValue().setTf_normalizad(f.getTf()/(double)totalUni);
+            });
+            
+            freq_bi.entrySet().forEach((lf) -> {
+                Frequencia f = lf.getValue();
+                lf.getValue().setTf_normalizad(f.getTf()/(double)totalBi);
+            });
+            
+            fromDB.setFreq_bigrama(freq_bi);
+            fromDB.setFreq_unigrama(freq_uni);
+
+//            for (Entry<Lexico, Frequencia> lf : freq_bi.entrySet()) {
+//                System.out.println(lf.getKey() + " " + lf.getValue());
+//            }
+//            for (Entry<Lexico, Frequencia> lf : freq_uni.entrySet()) {
+//                System.out.println(lf.getKey() + " " + lf.getValue());
+//            }
+//            System.out.println("\n\n");
+            tweets_read++;
         }
-        return commentstr;
+
+        return datasetAnotado;
     }
 
     //Método que gera um dicionário com todos os usários do tweets coletados e refinados
@@ -326,12 +488,7 @@ public class MainApp extends Application {
         return news;
     }
 
-    //Método Auxiliar para verificar se uma string contém menção para algun dos perfis públicos.
-    private static boolean stringContainsItemFromList(String inputStr, String[] items) {
-        return Arrays.stream(items).parallel().anyMatch(inputStr::contains);
-    }
-
-    //Método que gera um arquivo csv a partir de um dataset (mapeado).
+    //Métodos que geram um arquivo csv a partir de um dataset (mapeado).
     private static void geraCSV(HashMap<String, Tweet> dataset, String nome_arquivo) {
         try {
             FileWriter fw = new FileWriter(new File(nome_arquivo));
@@ -350,7 +507,6 @@ public class MainApp extends Application {
         }
     }
 
-    //Método que gera um arquivo csv a partir de um dataset (mapeado).
     private static void geraCSV2(HashMap<String, Integer> dataset, String nome_arquivo, boolean order) {
 
         try {
@@ -384,115 +540,48 @@ public class MainApp extends Application {
 
     }
 
-    private static void selected2Anotate(String path, HashMap<String, Tweet> dataset, int qtd) throws FileNotFoundException, IOException {
-        FileReader fr = new FileReader(new File(path));
-        BufferedReader br = new BufferedReader(fr);
+    //Método que gera o arquivo .CSV com os tweets para serem anotados;
+    private static void selected2Anotate(String path_2anotar, HashMap<String, Tweet> dataset) throws FileNotFoundException, IOException {
 
-        List<String> ids = new ArrayList<>();
+        FileWriter fw = new FileWriter(new File("anotacao/paraAnotar.csv"));
+        BufferedWriter bw = new BufferedWriter(fw);
+        bw.write("id;texto;posicionamento\n");
 
-        String line = br.readLine();
-        line = br.readLine();
+        File folder = new File(path_2anotar);
+        File[] listOfFiles = folder.listFiles();
 
-        while (line != null) {
-            String[] aux = line.split(";");
-            String id = aux[0];
-            ids.add(id);
-            line = br.readLine();
-        }
+        for (File file : listOfFiles) {
+            if (file.isFile()) {
 
-        br.close();
-        fr.close();
+                FileReader fr = new FileReader(file);
+                BufferedReader br = new BufferedReader(fr);
 
-        int anotadores = 3;
+                String line = br.readLine();
+                line = br.readLine();
 
-        for (int i = 1; i <= anotadores; i++) {
-            int qtdAnotador = qtd / anotadores;
+                while (line != null) {
+                    String[] aux = line.split(",");
+                    String id = aux[0].replace("\"", "");
 
-            FileWriter fw = new FileWriter(new File("anotacao/paraAnotar0" + i + ".csv"));
-            BufferedWriter bw = new BufferedWriter(fw);
-            bw.write("id;texto;anotacao\n");
+                    if (aux[1].equals("1")) {
+                        Tweet t = dataset.get(id);
+                        bw.write("\"" + t.getId() + "\"; \"" + t.getText() + "\";\n");
+                    }
 
-            Random generator = new Random();
+                    line = br.readLine();
+                }
 
-            while (qtdAnotador > 0) {
-                int pos = generator.nextInt(ids.size());
-                String id2write = ids.remove(pos);
-                Tweet t = dataset.get(id2write);
-                bw.write(t.getId() + "; \"" + t.getText() + "\";\" \"\n");
-                qtdAnotador--;
+                br.close();
+                fr.close();
             }
-
-            bw.close();
-            fw.close();
-        }
-    }
-
-//    private static HashMap<String, String> buildDicionarioInternet(String path) throws FileNotFoundException, IOException {
-//        HashMap<String, String> dic = new HashMap<>();
-//
-//        File fileDir = new File(path);
-//        BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(fileDir), "UTF8"));
-//
-//        FileWriter fw = new FileWriter(new File("dicionarios/dicionario_internetes.txt"));
-//        BufferedWriter bw = new BufferedWriter(fw);
-//
-//        String line = br.readLine();
-//
-//        while (line != null) {
-//            String[] tokens = line.split(" - ");
-//            if (!line.equals("")) {
-//
-//                for (String s : tokens) {
-//                    System.out.print(s + "\n");
-//                }
-//
-//                String abrev = tokens[0].toLowerCase();
-//                String corresp = tokens[1].toLowerCase();
-//
-//                if (corresp.contains("diminutivo de")) {
-//                    corresp = corresp.replace("diminutivo de", "");
-//                } else if (corresp.contains("diminutuvo de")) {
-//                    corresp = corresp.replace("diminutuvo de", "");
-//                } else if (corresp.contains("aumentativo de")) {
-//                    corresp = corresp.replace("aumentativo de", "");
-//                }
-//
-//                bw.write(abrev + ";" + corresp + "\n");
-//                dic.put(abrev, corresp);
-//            }
-//            line = br.readLine();
-//
-//        }
-//
-//        br.close();
-//        bw.close();
-//
-//        System.out.println(dic.size());
-//        return dic;
-//    }
-    private static HashMap<String, String> buildDicionarioInternet(String path) throws FileNotFoundException, IOException {
-        HashMap<String, String> dic = new HashMap<>();
-
-        FileReader fr = new FileReader(new File(path));
-        BufferedReader br = new BufferedReader(fr);
-
-        String line = br.readLine();
-
-        while (line != null) {
-            String[] tokens = line.split(";");
-            String abrev = tokens[0];
-            String corresp = tokens[1];
-
-            dic.put(abrev, corresp);
-            line = br.readLine();
         }
 
-        br.close();
-
-        return dic;
+        bw.close();
+        fw.close();
     }
 
-    private static HashMap<String, HashMap<String, Integer>> buildUnigramaPolarizado(String path) throws FileNotFoundException, IOException {
+    //Métodos para criar o Unigrama e Bigrama;    
+    private static HashMap<String, HashMap<String, Integer>> buildUnigramaPolarizado(String path, List<Lexico> dicionarioLexico) throws FileNotFoundException, IOException {
         HashMap<String, HashMap<String, Integer>> unigrama = new HashMap<>();
         unigrama.put("POS", new HashMap<>());
         unigrama.put("NEG", new HashMap<>());
@@ -561,17 +650,46 @@ public class MainApp extends Application {
                         sentence.getTokens().forEach((token) -> {
                             for (String s : token.getLemmas()) {
                                 String t_type = token.getPOSTag();
-                                String sAcento = removerAcentos(s);
+                                String sAcento = removerAcentos(s).toLowerCase();
 
                                 if ((t_type.equals("n") || t_type.equals("prop") || t_type.equals("adj") || t_type.equals("adv")
                                         || t_type.equals("v-fin") || t_type.equals("v-inf") || t_type.equals("v-pcp") || t_type.equals("v-ger")) && !verbosLig.contains(sAcento)) {
 
-                                    if (pal_freq.containsKey(sAcento)) {
-                                        int freq = pal_freq.get(sAcento);
-                                        pal_freq.put(sAcento, (freq + 1));
+                                    int polaridade = 1;
+                                    char anot = 'M';
 
-                                    } else {
-                                        pal_freq.put(sAcento, 1);
+                                    for (Lexico aux : dicionarioLexico) {
+                                        //Se o token atual possui sentimento, de acordo com o dic
+                                        if (aux.getPalavra().equals(sAcento)) {
+                                            anot = aux.getTipo_anotacao();
+
+                                            switch (aux.getPolaridade()) {
+                                                case -1:
+                                                    polaridade = -2;
+                                                    break;
+                                                case 1:
+                                                    polaridade = 2;
+                                                    break;
+                                                default:
+                                                    polaridade = 1;
+                                            }
+                                            break;
+                                        } //Se não foi encontrado o sentimento do token atual
+                                    }
+
+                                    //Lexico que representa um token anotado manualmente a polaridade;
+                                    Lexico l = new Lexico(sAcento, t_type, anot, polaridade);
+
+                                    //Adicionar o léxico à lista do tweet respectivo contabilizando sua frequencia;
+                                    if (true) //                                    if (pal_freq.containsKey(sAcento)) {
+                                    //                                        int freq = pal_freq.get(sAcento);
+                                    //                                        pal_freq.put(sAcento, (freq + 1));
+                                    //
+                                    //                                    } else {
+                                    //                                        pal_freq.put(sAcento, 1);
+                                    //                                    }
+                                    {
+
                                     }
                                 }
                             }
@@ -693,63 +811,177 @@ public class MainApp extends Application {
         return bigrama;
     }
 
-    private static String removerAcentos(String str) {
-        return Normalizer.normalize(str, Normalizer.Form.NFD).replaceAll("[^\\p{ASCII}]", "");
-    }
+    //Métodos para criar os dicionários utilizados: internetes e lexico
+    private static HashMap<String, Lexico> buildDicionarioLexico(String path) throws FileNotFoundException, IOException {
+        HashMap<String, Lexico> dic = new HashMap<>();
 
-    private static List<Lexico> buildDicionarioLexico(String path) throws FileNotFoundException, IOException {
-        List<Lexico> dic = new ArrayList<>();
+        File folder = new File(path);
+        File[] listOfFiles = folder.listFiles();
 
-        FileReader fr = new FileReader(new File(path));
-        BufferedReader br = new BufferedReader(fr);
+        for (File file : listOfFiles) {
+            if (file.isFile()) {
+                FileReader fr = new FileReader(file);
+                BufferedReader br = new BufferedReader(fr);
 
-        String line = br.readLine();
+                String line = br.readLine();
 
-        while (line != null) {
-            String[] aux = line.split(",");
-            Lexico l = new Lexico(aux[0], aux[1], aux[3].charAt(0), Integer.parseInt(aux[2]));
-            dic.add(l);
-            line = br.readLine();
+                if (line.equals("op1")) {
+                    line = br.readLine();
+
+                    while (line != null) {
+                        String[] aux = line.split(",");
+                        String palavra = aux[0].toLowerCase();
+                        Lexico l = new Lexico(palavra, aux[1], aux[3].charAt(0), Integer.parseInt(aux[2]));
+                        dic.put(palavra, l);
+                        line = br.readLine();
+                    }
+                } else if (line.equals("op2")) {
+                    line = br.readLine();
+
+                    while (line != null) {
+                        String[] aux = line.split(";");
+                        String palavra = StringUtils.strip(aux[0].toLowerCase(), ".");
+                        String tag = aux[0].split("=")[1];
+                        int polaridade = Integer.parseInt(aux[3].split("=")[1]);
+                        char t_anot = aux[4].split("=")[1].charAt(0);
+
+                        Lexico l = new Lexico(palavra, tag, t_anot, polaridade);
+                        dic.put(palavra, l);
+                        line = br.readLine();
+                    }
+                }
+
+                br.close();
+            }
         }
 
         return dic;
     }
 
-    private static void selected2AnotatePraias(String path, HashMap<String, Tweet> dataset, String mes) throws FileNotFoundException, IOException {
+    private static HashMap<String, String> buildDicionarioInternet(String path) throws FileNotFoundException, IOException {
+        HashMap<String, String> dic = new HashMap<>();
+
         FileReader fr = new FileReader(new File(path));
         BufferedReader br = new BufferedReader(fr);
 
-        List<String> ids = new ArrayList<>();
-
         String line = br.readLine();
-        line = br.readLine();
 
         while (line != null) {
-            String[] aux = line.split(";");
-            String id = aux[0];
-            String selected = aux[1];
-            if (selected.endsWith("1")) {
-                ids.add(id);
-            }
+            String[] tokens = line.split(";");
+            String abrev = tokens[0];
+            String corresp = tokens[1];
+
+            dic.put(abrev, corresp);
             line = br.readLine();
         }
 
         br.close();
-        fr.close();
+
+        return dic;
+    }
+
+    //Métodos Auxiliares
+    //Método Auxiliar para a remoção de acentos
+    private static String removerAcentos(String str) {
+        return Normalizer.normalize(str, Normalizer.Form.NFD).replaceAll("[^\\p{ASCII}]", "");
+    }
+
+    //Método Auxiliar para a remoção de urls em um determinado texto
+    private static String removeUrl(String commentstr) {
+
+        // rid of ? and & in urls since replaceAll can't deal with them
+        String commentstr1 = commentstr.replaceAll("\\?", "").replaceAll("\\&", "").replaceAll("\\(", "").replaceAll("\\)", "");
+
+        String urlPattern = "((https?|ftp|gopher|telnet|file|Unsure|http):((//)|(\\\\))+[\\w\\d:#@%/;$()~_?\\+-=\\\\\\.&]*)";
+        Pattern p = Pattern.compile(urlPattern, Pattern.CASE_INSENSITIVE);
+        Matcher m = p.matcher(commentstr1);
         int i = 0;
-
-        for (String id : ids) {
-            if (i < 100) {
-                FileWriter fw = new FileWriter(new File("anotacao/paraAnotar_+" + mes + ".csv"));
-                BufferedWriter bw = new BufferedWriter(fw);
-                bw.write("id;texto;anotador1;anotador2;anotador3\n");
-
-                bw.write(id + "; \"" + dataset.get(id).getText() + "\";\" \";\" \";\" \"\n");
-
-                bw.close();
-                fw.close();
+        while (m.find()) {
+            if (m.group(i) != null) {
+                commentstr = commentstr1.replaceAll(m.group(i), "").trim();
                 i++;
             }
         }
+        return commentstr;
+    }
+
+    //Método Auxiliar para verificar se uma string contém menção para algun dos perfis públicos
+    private static boolean stringContainsItemFromList(String inputStr, String[] items) {
+        return Arrays.stream(items).parallel().anyMatch(inputStr::contains);
+    }
+
+    //Método que constrói um map de ids anotados e suas polaridades, de acordo com os anotadores;
+    private static HashMap<String, Integer> ids_anotadosManual(String path_a1, String path_a2, String path_a3) throws FileNotFoundException, IOException {
+        HashMap<String, Integer> id_polarizacao = new HashMap<>();
+
+        FileReader an_1 = new FileReader(new File(path_a1));
+        FileReader an_2 = new FileReader(new File(path_a2));
+        FileReader an_3 = new FileReader(new File(path_a3));
+
+        BufferedReader b1 = new BufferedReader(an_1);
+        BufferedReader b2 = new BufferedReader(an_2);
+        BufferedReader b3 = new BufferedReader(an_3);
+
+        String l1 = b1.readLine();
+        String l2 = b2.readLine();
+        String l3 = b3.readLine();
+
+        while (l1 != null && l2 != null && l3 != null) {
+            String[] aux1 = l1.split(";");
+            String[] aux2 = l2.split(";");
+            String[] aux3 = l3.split(";");
+
+            String id = aux1[0];
+
+            if (aux1.length > 2 && aux2.length > 2 && aux3.length > 2) {
+                List<String> bag_pol = Arrays.asList(aux1[2], aux2[2], aux3[2]);
+                String pol = maxOcorrencia(bag_pol);
+                if (pol != null) {
+                    id_polarizacao.put(id, Integer.parseInt(pol));
+
+                    //Caso polaridade nula, onde os 3 anotadores discordaram;
+                    //System.out.println(aux1[2] + " " + aux2[2] + " " + aux3[2] + " :" + id + "; " + aux1[1]);
+                }
+
+            }
+
+            l1 = b1.readLine();
+            l2 = b2.readLine();
+            l3 = b3.readLine();
+        }
+
+        b1.close();
+        b2.close();
+        b3.close();
+
+        return id_polarizacao;
+    }
+
+    //Método que retorna o número com a maior ocorrência dentro de um array;
+    private static String maxOcorrencia(List<String> set) {
+        String maiorOc = null;
+        int maior = 0;
+
+        HashMap<String, Integer> kappa = new HashMap<>();
+        set.forEach((p) -> {
+            if (kappa.containsKey(p)) {
+                int fA = kappa.get(p);
+                kappa.put(p, fA + 1);
+            } else {
+                kappa.put(p, 1);
+            }
+        });
+
+        if (kappa.size() < 3) {
+            for (Entry<String, Integer> e : kappa.entrySet()) {
+                if (e.getValue() > maior) {
+                    maior = e.getValue();
+                    maiorOc = e.getKey();
+                }
+            }
+
+        }
+
+        return maiorOc;
     }
 }

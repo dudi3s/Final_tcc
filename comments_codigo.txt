@@ -1,0 +1,64 @@
+        //        selected2Anotate("amostragem/", datasetOriginal);
+//        FileWriter fw = new FileWriter(new File(mes + ".txt"));
+//        BufferedWriter bw = new BufferedWriter(fw);
+//
+//        bw.write("id\n");
+//
+//        for (Entry<String, Tweet> tc : dataset.entrySet()) {
+//            bw.write("\"" + tc.getKey() + "\"" + "\n");
+//        }
+//
+//        bw.close();
+//        fw.close();
+//        System.out.println("done");
+        //HashMap<String, Tweet> datasetAnotado = buildDataSetAnotado("anotacao/anotados/", dicionarioLexico, dataset);
+        //HashMap<String, Integer> rank = buidUserRank(dataset);
+        //HashMap<Integer, List<Tweet>> tweets_por_faixa = buildFaixas(dataset);
+        //buildArquivosFaixas(tweets_por_faixa, mes);
+        //HashMap<String, Tweet> dataset_news = buildDataSetNews(dataset);
+        //geraCSV(dataset, "datasets/" + mes + ".csv");
+        //geraCSV2(rank, "ranks/" + mes + ".csv", DESC);
+        //selected2Anotate("distribuicao/" + mes + "/todasFaixas.csv", dataset, 200);
+        //System.out.println(dataset.size());
+//        HashMap<String, HashMap<String, Integer>> classes = buildUnigramaPolarizado("anotacao/anotados/");
+//        for (Entry<String, HashMap<String, Integer>> cl : classes.entrySet()) {
+//            System.out.println("CLASSE: " + cl.getKey());
+//            for (Entry<String, Integer> pf : cl.getValue().entrySet()) {
+//                System.out.println(pf.getKey() + ": " + pf.getValue());
+//            }
+//
+//            System.out.println("\n");
+//        }
+        //selected2AnotatePraias("/anotacao/anotados/", dataset, mes);
+		
+		
+		//
+//    private static void selected2Anotate(String path_2anotar, HashMap<String, Tweet> dataset, String mes) throws FileNotFoundException, IOException {
+//        FileReader fr = new FileReader(new File(path_2anotar));
+//        BufferedReader br = new BufferedReader(fr);
+//
+//        FileWriter fw = new FileWriter(new File("anotacao/paraAnotar_" + mes + ".csv"));
+//        BufferedWriter bw = new BufferedWriter(fw);
+//        bw.write("id;texto\n");
+//
+//        String line = br.readLine();
+//        line = br.readLine();
+//
+//        while (line != null) {
+//            String[] aux = line.split(",");
+//            String id = aux[0].replace("\"", "");
+//
+//            if (aux[1].equals("1")) {
+//                Tweet t = dataset.get(id);
+//                bw.write("\"" + t.getId() + "\"; \"" + t.getText() + "\"\n");
+//            }
+//
+//            line = br.readLine();
+//        }
+//
+//        bw.close();
+//        fw.close();
+//
+//        br.close();
+//        fr.close();
+//    }

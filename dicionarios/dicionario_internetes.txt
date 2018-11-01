@@ -60,14 +60,15 @@ cda;cada
 chegay;cheguei
 choranu;chorando
 clike;clique
-cmg;comigo
 cntg;contigo
 colok;colocar
 coment's;comentário
+coment;comentário
 comg;comigo
 pfv;por favor
 complikadu;complicado
 com migo;comigo
+cmg;comigo
 corguin;córrego
 covard;covarde
 culete;colete
